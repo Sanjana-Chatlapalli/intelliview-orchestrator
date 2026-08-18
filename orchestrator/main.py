@@ -73,6 +73,7 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 )
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
+from routers.users import router as users_router
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -296,6 +297,7 @@ dashboard_routes = create_dashboard_routes(
     ws_manager=ws_manager,
 )
 app.include_router(dashboard_routes, prefix="/monitoring", tags=["monitoring"])
+app.include_router(users_router)
 
 # Register application routes
 app.include_router(

@@ -12,9 +12,11 @@ from database.models.interview_session import InterviewSession
 from database.models.interview_template import InterviewTemplate
 from database.models.notification import Notification
 from database.models.question import Question
+from .user import User
 
 __all__ = [
     "Base",
+    "User",
     "Candidate",
     "InterviewSession",
     "InterviewTemplate",
@@ -22,3 +24,4 @@ __all__ = [
     "Question",
     "utcnow",
 ]
+

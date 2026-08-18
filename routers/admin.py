@@ -6,19 +6,23 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from config import API_TOKEN
 from orchestrator import http_cache
-from orchestrator.auth import create_access_token, require_token
+from orchestrator.auth import create_access_token, require_token, verify_password
 from orchestrator.load_balancer import BalancingStrategy
 from orchestrator.security import require_role
+
+from database.db import get_db
+from database.models import User
+
 
 logger = logging.getLogger(__name__)
 
 
 class LoginRequest(BaseModel):
-    api_token: str
-
+    email: str
+    password: str
 
 def create_admin_routes(state_sync, load_balancer) -> APIRouter:
     """Create cache management, strategy-switching, moment-tracking, and dashboard routes.
@@ -36,17 +40,45 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
     # ========== Auth ==========
 
     @router.post("/login")
-    async def login(request: LoginRequest):
-        """
-        Exchange a valid API token for a JWT access token.
-        """
+    async def login(
+        request: LoginRequest,
+        db: Session = Depends(get_db),
+    ):
+        """Authenticate HR/admin user and return JWT."""
 
-        if request.api_token != API_TOKEN:
-            raise HTTPException(status_code=401, detail="Invalid API token")
+        user = (
+            db.query(User)
+            .filter(User.email == request.email)
+            .first()
+        )
 
-        access_token = create_access_token({"sub": "system", "role": "admin"})
+        if not user or not verify_password(
+            request.password,
+            user.password_hash,
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password",
+            )
 
-        return {"access_token": access_token, "token_type": "bearer"}
+        access_token = create_access_token(
+            {
+                "sub": str(user.id),
+                "email": user.email,
+                "role": user.role,
+            }
+        )
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+            },
+        }
 
     @router.get("/admin/fairness-audit", dependencies=[Depends(require_token)])
     async def get_fairness_audit_report():
