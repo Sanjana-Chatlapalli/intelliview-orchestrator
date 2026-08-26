@@ -50,6 +50,7 @@ from orchestrator.request_validation import RequestValidationMiddleware
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 from orchestrator.scheduler import Scheduler, TaskPriority
 from orchestrator.session_manager import SessionManager
+from routers.export import router as export_router
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
@@ -221,6 +222,7 @@ dashboard_routes = create_dashboard_routes(
     ws_manager=ws_manager,
 )
 app.include_router(dashboard_routes, prefix="/monitoring", tags=["monitoring"])
+app.include_router(export_router)
 
 
 # ========== Request/Response Models ==========
