@@ -1,7 +1,7 @@
 import difflib
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Boolean, Column, Integer, String
 
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import declarative_base
