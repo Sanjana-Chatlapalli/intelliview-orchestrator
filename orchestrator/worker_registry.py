@@ -50,6 +50,10 @@ class WorkerRegistry:
             self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
             self._hydrated = False
+            # Issue #64: Auto-scale suggestion tracking
+            self._high_load_streaks: dict[str, int] = {}
+            self.utilization_threshold = 85.0
+            self.required_consecutive_checks = 3
             self._hydrate_from_redis()
 
             # Keep a strong reference to background tasks to prevent garbage collection
@@ -351,6 +355,36 @@ class WorkerRegistry:
                     timezone.utc
                 ).isoformat()
                 self.local_workers[worker_id]["status"] = "healthy"
+                # Issue #64: Suggest scaling when utilization remains high.
+                capacity = self.local_workers[worker_id].get("capacity", 4)
+                utilization = (active_tasks / capacity * 100) if capacity > 0 else 0.0
+
+                current_streak = self._high_load_streaks.get(worker_id, 0)
+
+                if utilization >= self.utilization_threshold:
+                    current_streak += 1
+                    self._high_load_streaks[worker_id] = current_streak
+
+                    logger.info(
+                        f"Worker {worker_id} utilization at {utilization:.1f}% "
+                        f"(streak: {current_streak}/{self.required_consecutive_checks})"
+                    )
+
+                    if current_streak >= self.required_consecutive_checks:
+                        logger.warning(
+                            f"[AUTO-SCALE SUGGESTION] Worker {worker_id} has sustained high "
+                            f"utilization ({utilization:.1f}%) for "
+                            f"{current_streak} consecutive checks. "
+                            f"Recommendation: Scale up worker capacity. "
+                            f"(No auto-provisioning performed)."
+                        )
+                else:
+                    if current_streak > 0:
+                        logger.info(
+                            f"Worker {worker_id} utilization normalized to "
+                            f"{utilization:.1f}%. Resetting streak."
+                        )
+                    self._high_load_streaks[worker_id] = 0
 
             # Update in Redis
             if self.redis_client:
@@ -650,6 +684,9 @@ class WorkerRegistry:
             with self.lock:
                 if worker_id in self.local_workers:
                     del self.local_workers[worker_id]
+
+                # Issue #64: Clear autoscale streak when worker is deregistered.
+                self._high_load_streaks.pop(worker_id, None)
 
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"

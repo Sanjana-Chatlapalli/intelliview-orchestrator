@@ -179,3 +179,41 @@ def test_register_worker_default_weight_equals_capacity():
     assert w is not None
     assert w["weight"] == 8  # defaults to capacity
     assert w["capacity"] == 8
+
+
+def test_heartbeat_high_utilization_triggers_autoscale_suggestion(caplog):
+    reg = _new_registry()
+    reg.register_worker("scale-worker", capacity=4)
+
+    with caplog.at_level("WARNING"):
+        reg.heartbeat("scale-worker", active_tasks=4)
+        reg.heartbeat("scale-worker", active_tasks=4)
+        reg.heartbeat("scale-worker", active_tasks=4)
+
+    assert "[AUTO-SCALE SUGGESTION]" in caplog.text
+
+
+def test_heartbeat_utilization_reset_clears_streak():
+    reg = _new_registry()
+    reg.register_worker("scale-worker", capacity=4)
+
+    reg.heartbeat("scale-worker", active_tasks=4)
+    reg.heartbeat("scale-worker", active_tasks=4)
+
+    assert reg._high_load_streaks["scale-worker"] == 2
+
+    reg.heartbeat("scale-worker", active_tasks=2)
+
+    assert reg._high_load_streaks["scale-worker"] == 0
+
+
+def test_deregister_worker_clears_autoscale_streak():
+    reg = _new_registry()
+    reg.register_worker("scale-worker", capacity=4)
+
+    reg.heartbeat("scale-worker", active_tasks=4)
+    assert reg._high_load_streaks["scale-worker"] == 1
+
+    assert reg.deregister_worker("scale-worker") is True
+
+    assert "scale-worker" not in reg._high_load_streaks
