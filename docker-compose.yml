@@ -5,14 +5,21 @@ services:
     container_name: ai-interview-redis
     ports:
       - "6379:6379"
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command:
+      - redis-server
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
     environment:
+<<<<<<< Updated upstream
       - REDIS_REPLICATION_MODE=master
       - MALLOC_CONF=lg_dirty_mult:8
+=======
+      REDIS_REPLICATION_MODE: master
+>>>>>>> Stashed changes
     volumes:
       - redis_data:/data
-    networks:
-      - ai-interview-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -21,8 +28,10 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "1"
           memory: 512M
-          cpus: "1.0"
+    networks:
+      - ai-interview-network
 
   postgres:
     image: postgres:15-alpine
@@ -33,11 +42,9 @@ services:
     environment:
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - ai-interview-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -46,8 +53,10 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "2"
           memory: 1G
-          cpus: "2.0"
+    networks:
+      - ai-interview-network
 
   fastapi:
     build:
@@ -56,12 +65,19 @@ services:
     container_name: ai-interview-fastapi
     ports:
       - "8000:8000"
+    command:
+      - uvicorn
+      - orchestrator.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
     environment:
-      REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
+<<<<<<< Updated upstream
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       RATE_LIMIT_PER_MINUTE: "${RATE_LIMIT_PER_MINUTE:-1000}"
@@ -70,45 +86,65 @@ services:
       AUDIT_LOG_FILE: "${AUDIT_LOG_FILE:-}"
     volumes:
       - sqlite_data:/app/data
+=======
+      POSTGRES_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
+      API_TOKEN: ci-dev-token-local
+      CORS_ALLOW_ORIGINS: "*"
+      ENABLE_PROMETHEUS: "true"
+      RATE_LIMIT_PER_MINUTE: "1000"
+      GRAFANA_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
+      AUDIT_LOG_FILE: ""
+>>>>>>> Stashed changes
     depends_on:
-      redis:
-        condition: service_healthy
       postgres:
         condition: service_healthy
-    networks:
-      - ai-interview-network
-    command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000 --workers 1
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
+<<<<<<< Updated upstream
         [
           "CMD",
           "python",
           "-c",
           "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"
         ]
+=======
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"
+>>>>>>> Stashed changes
       interval: 20s
       timeout: 10s
-      start_period: 40s
       retries: 3
+      start_period: 45s
     deploy:
       resources:
         limits:
+          cpus: "2"
           memory: 1G
-          cpus: "2.0"
+    networks:
+      - ai-interview-network
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: ai-interview-worker
+    command:
+      - python
+      - -m
+      - workers.worker_entrypoint
     ports:
       - "9101:9101"
     environment:
-      REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
+<<<<<<< Updated upstream
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
 
       API_URL: "http://fastapi:8000"
@@ -117,15 +153,25 @@ services:
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
       CV_SERVICE_URL: http://cv-service:8001
+=======
+      POSTGRES_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
+      API_URL: http://fastapi:8000
+      API_TOKEN: ci-dev-token-local
+      CV_SERVICE_URL: http://cv-service:8001
+      WORKER_CONCURRENCY: "4"
+      WORKER_ID: worker-1
+>>>>>>> Stashed changes
     depends_on:
-      redis:
-        condition: service_healthy
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       fastapi:
         condition: service_healthy
       cv-service:
         condition: service_started
+<<<<<<< Updated upstream
     volumes:
       - .:/app
     networks:
@@ -142,15 +188,28 @@ services:
           "inspect",
           "ping"
         ]
+=======
+    healthcheck:
+      test:
+        - CMD
+        - celery
+        - -A
+        - workers.celery_app
+        - inspect
+        - ping
+>>>>>>> Stashed changes
       interval: 30s
       timeout: 10s
-      start_period: 30s
       retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
+          cpus: "4"
           memory: 2G
-          cpus: "4.0"
+    restart: unless-stopped
+    networks:
+      - ai-interview-network
 
   cv-service:
     build:
@@ -159,6 +218,7 @@ services:
     container_name: ai-interview-cv-service
     ports:
       - "8001:8001"
+<<<<<<< Updated upstream
     networks:
       - ai-interview-network
     restart: unless-stopped
@@ -209,11 +269,25 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+=======
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8001/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+>>>>>>> Stashed changes
     deploy:
       resources:
         limits:
+          cpus: "1"
           memory: 512M
-          cpus: "1.0"
+    networks:
+      - ai-interview-network
 
   celery-exporter:
     image: danihodovic/celery-exporter
@@ -233,17 +307,14 @@ services:
     networks:
       - ai-interview-network
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: ai-interview-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    networks:
-      - ai-interview-network
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-flower
+    working_dir: /app
     command:
+<<<<<<< Updated upstream
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
@@ -264,9 +335,17 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: ai-interview-grafana
+=======
+      - celery
+      - -A
+      - workers.celery_app.celery_app
+      - flower
+      - --url_prefix=flower
+>>>>>>> Stashed changes
     ports:
-      - "3001:3000"
+      - "5555:5555"
     environment:
+<<<<<<< Updated upstream
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -289,14 +368,64 @@ services:
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:14269/"]
       interval: 15s
+=======
+      REDIS_URL: redis://redis:6379/0
+      API_TOKEN: ci-dev-token-local
+      PYTHONPATH: /app
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:5555/flower/
+      interval: 30s
+>>>>>>> Stashed changes
       timeout: 5s
-      start_period: 30s
       retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
+<<<<<<< Updated upstream
           memory: 256M
           cpus: "0.5"
+=======
+          cpus: "1"
+          memory: 512M
+    networks:
+      - ai-interview-network
+
+  digest-notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-digest-notifications
+    working_dir: /app/Digest-Notifications
+    command:
+      - python
+      - src/digest.py
+      - --serve
+      - --port
+      - "8080"
+      - --host
+      - 0.0.0.0
+    ports:
+      - "8080:8080"
+    environment:
+      API_TOKEN: dev-token-change-me
+      DIGEST_BATCH_SIZE: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    restart: unless-stopped
+    networks:
+      - ai-interview-network
+>>>>>>> Stashed changes
 
   frontend:
     build:
@@ -306,15 +435,18 @@ services:
     ports:
       - "3000:3000"
     environment:
+<<<<<<< Updated upstream
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+=======
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+>>>>>>> Stashed changes
     depends_on:
       fastapi:
         condition: service_healthy
-    networks:
-      - ai-interview-network
     healthcheck:
       test:
+<<<<<<< Updated upstream
         [
           "CMD",
           "wget",
@@ -322,14 +454,23 @@ services:
           "-q",
           "http://127.0.0.1:3000/"
         ]
+=======
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://127.0.0.1:3000/
+>>>>>>> Stashed changes
       interval: 15s
       timeout: 5s
-      start_period: 30s
       retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
+          cpus: "1"
           memory: 512M
+<<<<<<< Updated upstream
           cpus: "1.0"
 
   digest-notifications:
@@ -362,19 +503,94 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
+=======
+    networks:
+      - ai-interview-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-interview-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://localhost:9090/-/healthy
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-interview-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-interview-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - ai-interview-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: ai-interview-jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://localhost:3000/api/health
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+>>>>>>> Stashed changes
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: "1.0"
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - ai-interview-network
+
+networks:
+  ai-interview-network:
+    driver: bridge
 
 volumes:
   redis_data:
   postgres_data:
   prometheus_data:
+<<<<<<< Updated upstream
   grafana_data:
   sqlite_data:
 
 networks:
   ai-interview-network:
     driver: bridge
+=======
+  grafana_data:
+>>>>>>> Stashed changes

@@ -1,5 +1,5 @@
-fastapi
-uvicorn
-opencv-python
-mediapipe
-numpy
+fastapi==0.115.6
+uvicorn==0.34.0
+opencv-python==4.10.0.84
+mediapipe==0.10.21
+numpy==1.26.4

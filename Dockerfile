@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+<<<<<<< Updated upstream
 # ---------------------------------------------------------
 # Create non-root user
 # ---------------------------------------------------------
@@ -42,6 +43,11 @@ RUN groupadd --system --gid 1001 appgroup && \
 # This improves Docker layer caching
 # ---------------------------------------------------------
 COPY requirements.txt /app/requirements.txt
+=======
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --no-deps torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install -r requirements.txt
+>>>>>>> Stashed changes
 
 # ---------------------------------------------------------
 # Install PyTorch CPU version

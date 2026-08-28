@@ -36,6 +36,7 @@ pytest-cov==6.0.0
 testcontainers
 # === Hallucination Detector ===
 sentence-transformers
+<<<<<<< Updated upstream
 # === Computer Vision ===
 opencv-python
 mediapipe
@@ -46,3 +47,6 @@ faiss-cpu
 google-generativeai
 # === Load Testing ===
 locust
+=======
+email-validator
+>>>>>>> Stashed changes
