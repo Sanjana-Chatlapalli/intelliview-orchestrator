@@ -1,8 +1,4 @@
-import pytest
 
-from workers.scoring_models import (  # Replace with the actual function name in your codebase
-    calculate_score,
-)
 
 
 def test_scoring_output_ranges():
