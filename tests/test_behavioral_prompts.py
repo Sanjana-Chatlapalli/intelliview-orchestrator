@@ -65,11 +65,15 @@ def test_five_sample_transcripts_cover_follow_up_cases():
     assert len(SAMPLE_TRANSCRIPTS) == 5
 
     follow_up_cases = [
-        transcript for transcript in SAMPLE_TRANSCRIPTS if transcript["expected_follow_up"]
+        transcript
+        for transcript in SAMPLE_TRANSCRIPTS
+        if transcript["expected_follow_up"]
     ]
 
     complete_cases = [
-        transcript for transcript in SAMPLE_TRANSCRIPTS if not transcript["expected_follow_up"]
+        transcript
+        for transcript in SAMPLE_TRANSCRIPTS
+        if not transcript["expected_follow_up"]
     ]
 
     assert len(follow_up_cases) == 4
