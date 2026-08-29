@@ -28,18 +28,14 @@ def test_candidate_survey_prompt_contains_company_name_twice():
 
 def test_survey_extraction_prompt_formats_without_error():
     """SURVEY_EXTRACTION_PROMPT must accept {candidate_reply} without KeyError."""
-    result = SURVEY_EXTRACTION_PROMPT.format(
-        candidate_reply="9 - loved the process"
-    )
+    result = SURVEY_EXTRACTION_PROMPT.format(candidate_reply="9 - loved the process")
     assert "9 - loved the process" in result
 
 
 def test_survey_extraction_prompt_contains_json_braces():
     """After formatting, the extraction prompt must still contain literal
     JSON braces from the example shape — i.e. the doubled braces resolved."""
-    result = SURVEY_EXTRACTION_PROMPT.format(
-        candidate_reply="placeholder"
-    )
+    result = SURVEY_EXTRACTION_PROMPT.format(candidate_reply="placeholder")
     assert '"nps_score"' in result
     assert '"verbatim"' in result
     assert '"declined"' in result

@@ -554,7 +554,7 @@ SURVEY_EXTRACTION_PROMPT = (
     "Rules:\n"
     "- Only fill nps_score if a number was actually stated. Words count "
     '("eight", "a solid nine"), as do "8/10" and "8 out of ten".\n'
-    "- NEVER infer a score from tone. \"That was great!\" with no number "
+    '- NEVER infer a score from tone. "That was great!" with no number '
     "is nps_score null, not 10. This is the most important rule.\n"
     '- A range ("8 or 9") takes the lower value; put the detail in notes.\n'
     '- Out-of-scale numbers clamp into 0-10 ("11/10" becomes 10); '
