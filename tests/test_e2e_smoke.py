@@ -45,7 +45,12 @@ def _wait_for_worker(base_url: str, timeout: float = 30.0) -> None:
             r = httpx.get(f"{base_url}/system-health", timeout=2.0)
             if r.status_code == 200:
                 body = r.json()
-                if body.get("components", {}).get("workers", {}).get("healthy_workers", 0) >= 1:
+                if (
+                    body.get("components", {})
+                    .get("workers", {})
+                    .get("healthy_workers", 0)
+                    >= 1
+                ):
                     return
         except Exception as e:
             last_err = e
