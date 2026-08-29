@@ -1,4 +1,4 @@
-"""
+﻿"""
 End-to-end smoke tests against a running stack.
 
 Run the stack first:
@@ -9,11 +9,18 @@ Run the stack first:
 Set API_BASE_URL to override the default http://localhost:8000.
 """
 
+import os
 import time
 import uuid
 
 import httpx
 import pytest
+
+
+@pytest.fixture
+def api_base_url():
+    """Fixture to provide the API base URL."""
+    return os.getenv("API_BASE_URL", "http://localhost:8000")
 
 
 def _wait_for_api(base_url: str, timeout: float = 30.0) -> None:
@@ -30,6 +37,23 @@ def _wait_for_api(base_url: str, timeout: float = 30.0) -> None:
     pytest.fail(f"API not reachable at {base_url}: {last_err}")
 
 
+def _wait_for_worker(base_url: str, timeout: float = 30.0) -> None:
+    deadline = time.time() + timeout
+    last_err = None
+    while time.time() < deadline:
+        try:
+            r = httpx.get(f"{base_url}/system-health", timeout=2.0)
+            if r.status_code == 200:
+                body = r.json()
+                if body.get("components", {}).get("workers", {}).get("healthy_workers", 0) >= 1:
+                    return
+        except Exception as e:
+            last_err = e
+        time.sleep(1.0)
+    pytest.fail(f"Worker not ready at {base_url}: {last_err}")
+
+
+@pytest.mark.e2e
 def test_health(api_base_url):
     _wait_for_api(api_base_url)
     r = httpx.get(f"{api_base_url}/health", timeout=5.0)
@@ -39,6 +63,7 @@ def test_health(api_base_url):
     assert body["timestamp"]  # non-null now
 
 
+@pytest.mark.e2e
 def test_start_interview_and_get_status(api_base_url):
     _wait_for_api(api_base_url)
     _wait_for_worker(api_base_url)
@@ -46,6 +71,7 @@ def test_start_interview_and_get_status(api_base_url):
     r = httpx.post(
         f"{api_base_url}/start-interview",
         json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
+        headers={"X-API-Token": "test-token"},
         timeout=10.0,
     )
     assert r.status_code == 200, r.text
@@ -68,6 +94,7 @@ def test_start_interview_and_get_status(api_base_url):
     }
 
 
+@pytest.mark.e2e
 def test_system_health(api_base_url):
     _wait_for_api(api_base_url)
     r = httpx.get(f"{api_base_url}/system-health", timeout=5.0)
@@ -78,6 +105,7 @@ def test_system_health(api_base_url):
     assert "redis" in body["components"]
 
 
+@pytest.mark.e2e
 def test_worker_register_requires_token(api_base_url):
     _wait_for_api(api_base_url)
     # Without token — should be 401
@@ -97,6 +125,7 @@ def test_worker_register_requires_token(api_base_url):
     assert r.status_code == 200, r.text
 
 
+@pytest.mark.e2e
 def test_full_pipeline_completes(api_base_url):
     """End-to-end: start an interview, wait for the worker to process it."""
     _wait_for_api(api_base_url)
