@@ -101,6 +101,7 @@ def test_full_pipeline_completes(api_base_url):
     r = httpx.post(
         f"{api_base_url}/start-interview",
         json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
+        headers={"X-API-Token": "test-token"},
         timeout=10.0,
     )
     assert r.status_code == 200
