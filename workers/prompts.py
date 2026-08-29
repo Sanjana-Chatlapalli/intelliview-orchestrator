@@ -515,3 +515,67 @@ SDE_PROMPT_TEMPLATES = [
         ),
     },
 ]
+
+
+# ---------------------------------------------------------------------------
+# Post-Interview Candidate NPS Survey
+# ---------------------------------------------------------------------------
+
+CANDIDATE_SURVEY_PROMPT = (
+    "The interview is now complete. Thank the candidate for their time. "
+    "In the same message, ask two optional questions and state plainly "
+    "that the answers are about the interview process and do not affect "
+    "their evaluation.\n\n"
+    "Question 1: On a scale of 0 to 10, how likely are you to recommend "
+    "interviewing at {company_name} to a friend or colleague?\n"
+    "Question 2: What is the main reason for that score?\n\n"
+    "Rules:\n"
+    "- Both questions in a single message. Never split across turns.\n"
+    "- Whole message under 60 words. No preamble, no small talk.\n"
+    "- Neutral tone. No hoping they enjoyed it, no praise, no consolation, "
+    "no hint about performance.\n"
+    "- If they ask how they did or what happens next: brief answer that "
+    "results come from the {company_name} team, then repeat the two "
+    "questions once.\n"
+    "- If they give a reason but no number, ask once for a 0-10 number "
+    "and nothing more.\n"
+    "- If they decline, skip, or still give no number, thank them and end. "
+    "Never guess a score. Never ask a third time.\n"
+    "- No probing, no follow-ups, no arguing with a low score."
+)
+
+SURVEY_EXTRACTION_PROMPT = (
+    "Extract the candidate's NPS survey response from the text below. "
+    "Return JSON only — no prose, no markdown fences.\n\n"
+    "Candidate reply:\n{candidate_reply}\n\n"
+    "Required JSON shape:\n"
+    '{{"nps_score": <int 0-10 or null>, "verbatim": <string or null>, '
+    '"declined": <bool>, "notes": <string or null>}}\n\n'
+    "Rules:\n"
+    "- Only fill nps_score if a number was actually stated. Words count "
+    '("eight", "a solid nine"), as do "8/10" and "8 out of ten".\n'
+    "- NEVER infer a score from tone. \"That was great!\" with no number "
+    "is nps_score null, not 10. This is the most important rule.\n"
+    '- A range ("8 or 9") takes the lower value; put the detail in notes.\n'
+    '- Out-of-scale numbers clamp into 0-10 ("11/10" becomes 10); '
+    "note the original value in notes.\n"
+    "- verbatim is a lightly trimmed copy of what they said — no "
+    "summarising, rewriting, or cleaning up their opinion.\n"
+    "- declined is true only if they refused or skipped the survey.\n"
+    "- If nothing usable is found, return nulls with declined false."
+)
+
+
+def nps_category(score):
+    """Return the NPS category for a given score.
+
+    Returns ``"promoter"`` for 9-10, ``"passive"`` for 7-8,
+    ``"detractor"`` for 0-6, or ``None`` when *score* is ``None``.
+    """
+    if score is None:
+        return None
+    if score >= 9:
+        return "promoter"
+    if score >= 7:
+        return "passive"
+    return "detractor"
