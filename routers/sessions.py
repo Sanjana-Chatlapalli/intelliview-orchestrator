@@ -14,6 +14,7 @@ from database.db import get_db
 from database.models import Candidate, InterviewSession
 from metrics.prometheus_metrics import SESSIONS_ACTIVE, SESSIONS_CREATED
 from orchestrator import http_cache
+from orchestrator.candidate_manager import candidate_manager
 from orchestrator.scheduler import TaskPriority
 from orchestrator.security import get_current_user, require_role
 
@@ -503,6 +504,14 @@ def create_session_routes(
                 candidate_name=request.candidate_name,
                 position=request.position,
             )
+
+            # Record practice streak
+            try:
+                candidate_manager.record_practice(request.candidate_id)
+            except Exception as e:
+                logger.error(
+                    f"Failed to record practice streak for candidate {request.candidate_id}: {e}"
+                )
 
             # Increment total interview sessions created
             SESSIONS_CREATED.inc()
