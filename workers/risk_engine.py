@@ -167,6 +167,108 @@ class RiskScoringEngine:
         )
         return round(min(max(final_risk, 0.0), 1.0), 3)
 
+    
+        # ------------------------------------------------------------------
+    # D3: Integrity score fusion
+    #
+    # Combines the D2-defined anti-cheat signals (tab_switching,
+    # browser_activity, audio_interruptions, multiple_persons,
+    # candidate_absence, gaze_deviation, background_noise) into a single
+    # 0-100 integrity_score using a weighted average. Weights come from
+    # D2's RiskWeights schema (orchestrator/models.py), fetched per job
+    # position via orchestrator.store.get_weights_for_position(), and are
+    # normalized at scoring time so they do not need to sum to 1.
+    #
+    # Signal collection itself (tab-switch tracking, gaze/face detection,
+    # etc.) is out of scope here -- this function only fuses whatever
+    # values it is given.
+    # ------------------------------------------------------------------
+
+    # D2 signal names this fusion function understands, in a fixed order.
+    INTEGRITY_SIGNAL_NAMES: tuple[str, ...] = (
+        "tab_switching",
+        "browser_activity",
+        "audio_interruptions",
+        "multiple_persons",
+        "candidate_absence",
+        "gaze_deviation",
+        "background_noise",
+    )
+
+    @classmethod
+    def calculate_integrity_score(
+        cls,
+        signals: dict,
+        job_position: str | None = None,
+    ) -> float:
+        """
+        Fuse D2 anti-cheat signals into a single integrity_score (0-100).
+
+        Args:
+            signals: mapping of D2 signal names (see
+                INTEGRITY_SIGNAL_NAMES) to a 0-100 "risk level" for that
+                signal, where higher means more suspicious/riskier
+                (e.g. {"tab_switching": 20.0, "gaze_deviation": 5.0}).
+                A signal may be omitted or set to None if that source is
+                temporarily unavailable (partial data) -- it is simply
+                excluded from the average rather than causing an error.
+            job_position: optional job position name. When given, D2's
+                per-position weights are looked up via
+                orchestrator.store.get_weights_for_position(); otherwise
+                the D2 default weights (all 1.0) are used.
+
+        Returns:
+            A float in [0, 100], rounded to 2 decimals. 100 means no
+            risk detected across the available signals; 0 means maximum
+            combined risk. If every signal is missing/unavailable, a
+            neutral 100.0 ("no risk observed") is returned rather than
+            raising, since fusion should never crash on missing data.
+        """
+        # Local import avoids a hard/circular dependency between the
+        # workers package and the orchestrator package at module load
+        # time; only needed when a job_position lookup is requested.
+        from orchestrator.models import RiskWeights
+        from orchestrator.store import get_weights_for_position
+
+        weights = (
+            get_weights_for_position(job_position)
+            if job_position
+            else RiskWeights()
+        )
+        weight_by_signal = {
+            name: getattr(weights, name) for name in cls.INTEGRITY_SIGNAL_NAMES
+        }
+
+        weighted_risk_sum = 0.0
+        total_weight = 0.0
+
+        for name in cls.INTEGRITY_SIGNAL_NAMES:
+            raw_value = signals.get(name) if signals else None
+            if raw_value is None:
+                # Missing/partial signal: skip it gracefully instead of
+                # crashing or treating it as zero risk.
+                continue
+            try:
+                risk_value = float(raw_value)
+            except (TypeError, ValueError):
+                # Defensively skip malformed values the same way as
+                # missing ones, rather than raising.
+                continue
+            risk_value = min(max(risk_value, 0.0), 100.0)
+
+            weight = weight_by_signal[name]
+            weighted_risk_sum += weight * risk_value
+            total_weight += weight
+
+        if total_weight <= 0:
+            # No usable signals at all -> neutral default, never crash.
+            return 100.0
+
+        avg_risk = weighted_risk_sum / total_weight
+        integrity_score = 100.0 - avg_risk
+        return round(min(max(integrity_score, 0.0), 100.0), 2)
+
+        
     @staticmethod
     def _apply_critical_rule_overrides(
         final_risk: float, risk_classification: str
