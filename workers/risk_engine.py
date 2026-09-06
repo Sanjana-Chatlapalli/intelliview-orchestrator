@@ -167,8 +167,8 @@ class RiskScoringEngine:
         )
         return round(min(max(final_risk, 0.0), 1.0), 3)
 
-    
         # ------------------------------------------------------------------
+
     # D3: Integrity score fusion
     #
     # Combines the D2-defined anti-cheat signals (tab_switching,
@@ -231,9 +231,7 @@ class RiskScoringEngine:
         from orchestrator.store import get_weights_for_position
 
         weights = (
-            get_weights_for_position(job_position)
-            if job_position
-            else RiskWeights()
+            get_weights_for_position(job_position) if job_position else RiskWeights()
         )
         weight_by_signal = {
             name: getattr(weights, name) for name in cls.INTEGRITY_SIGNAL_NAMES
@@ -268,7 +266,6 @@ class RiskScoringEngine:
         integrity_score = 100.0 - avg_risk
         return round(min(max(integrity_score, 0.0), 100.0), 2)
 
-        
     @staticmethod
     def _apply_critical_rule_overrides(
         final_risk: float, risk_classification: str

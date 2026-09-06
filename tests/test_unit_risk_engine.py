@@ -152,7 +152,8 @@ def test_no_override_keeps_weighted_classification():
     )
 
     assert report["risk_classification"] == "LOW"
-    
+
+
 def test_integrity_score_all_signals_clean_is_100():
     # No risk at all on any D2 signal -> integrity_score should be 100.
     signals = {name: 0.0 for name in RiskScoringEngine.INTEGRITY_SIGNAL_NAMES}
@@ -266,6 +267,7 @@ def test_integrity_score_is_reproducible_for_same_input():
     score_1 = RiskScoringEngine.calculate_integrity_score(signals)
     score_2 = RiskScoringEngine.calculate_integrity_score(dict(signals))
     assert score_1 == score_2
+
 
 def test_multiple_persons_has_priority_over_face_absent():
     report = RiskScoringEngine.generate_risk_report(
