@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Single-source risk configuration — all weights & thresholds here.
 # Override via environment variables (prefix RISK_), e.g.
 #   RISK_VIDEO_WEIGHT=0.4 RISK_LOW_RISK_THRESHOLD=0.3
-# --------------------------------------------------------------------------- 
+# ---------------------------------------------------------------------------
 
 
 class RiskScoringEngine:
