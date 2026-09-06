@@ -614,9 +614,7 @@ def create_session_routes(
                 status=session_data.get("status"),
                 candidate_id=session_data.get("candidate_id"),
                 risk_score=session_data.get("risk_score"),
-                integrity_score=_compute_live_integrity_score(
-                    session_id, session_data
-                ),
+                integrity_score=_compute_live_integrity_score(session_id, session_data),
                 assigned_node=session_data.get("assigned_node"),
                 start_time=session_data.get("start_time"),
                 end_time=session_data.get("end_time"),
