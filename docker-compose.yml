@@ -152,6 +152,26 @@ services:
           memory: 2G
           cpus: "4.0"
 
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-celery-beat
+    ports:
+      - "9102:9102"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      BEAT_METRICS_PORT: "9102"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - ai-interview-network
+    command: python -m workers.beat_entrypoint
+    restart: unless-stopped
+
   cv-service:
     build:
       context: ./cv_service
@@ -241,6 +261,7 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
     networks:
       - ai-interview-network
     command:
