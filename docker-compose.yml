@@ -156,6 +156,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ai-interview-celery-beat
+    ports:
+      - "9102:9102"
     environment:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -175,12 +177,7 @@ services:
     working_dir: /app
     networks:
       - ai-interview-network
-    command:
-      - celery
-      - -A
-      - workers.celery_app.celery_app
-      - beat
-      - --loglevel=info
+    command: python -m workers.beat_entrypoint
     restart: unless-stopped
 
   cv-service:
@@ -293,24 +290,6 @@ services:
       start_period: 10s
       retries: 3
 
-  celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai-interview-celery-beat
-    ports:
-      - "9102:9102"
-    environment:
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    volumes:
-      - .:/app
-    networks:
-      - ai-interview-network
-    command: python -m workers.beat_entrypoint
-    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
