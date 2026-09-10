@@ -306,7 +306,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 path=request.url.path,
                 status=response.status_code,
                 actor=(
-                    "authenticated" if request.headers.get("x-api-token") else "anonymous"
+                    "authenticated"
+                    if request.headers.get("x-api-token")
+                    else "anonymous"
                 ),
                 request_id=request_id,
                 ip_address=request.client.host if request.client else "",
@@ -365,6 +367,7 @@ def require_token(
             ip_address=request.client.host if request.client else "",
         )
         raise HTTPException(status_code=401, detail="invalid or missing API token")
+
 
 class LoginRequest(BaseModel):
     api_token: str
