@@ -298,6 +298,19 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 status=response.status_code,
                 elapsed_ms=round(elapsed_ms, 1),
             )
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            from orchestrator.audit_logger import audit_logger
+
+            audit_logger.log_api_mutation(
+                method=request.method,
+                path=request.url.path,
+                status=response.status_code,
+                actor=(
+                    "authenticated" if request.headers.get("x-api-token") else "anonymous"
+                ),
+                request_id=request_id,
+                ip_address=request.client.host if request.client else "",
+            )
         return response
 
 
@@ -330,7 +343,9 @@ app.add_middleware(
 # ========== Auth ==========
 
 
-def require_token(x_api_token: str | None = Header(default=None)) -> None:
+def require_token(
+    request: StarletteRequest, x_api_token: str | None = Header(default=None)
+) -> None:
     """Dependency that requires a valid API token.
 
     Worker agents (and any privileged caller) must send `X-API-Token`.
@@ -340,8 +355,16 @@ def require_token(x_api_token: str | None = Header(default=None)) -> None:
         # In dev with the default token, accept but log.
         logger.debug("Using default API token — set API_TOKEN in production")
     if x_api_token != API_TOKEN:
-        raise HTTPException(status_code=401, detail="invalid or missing API token")
+        from orchestrator.audit_logger import audit_logger
 
+        audit_logger.log_security_event(
+            event_type="AUTH_FAILURE",
+            actor="unknown",
+            details={"path": request.url.path},
+            request_id=getattr(request.state, "request_id", ""),
+            ip_address=request.client.host if request.client else "",
+        )
+        raise HTTPException(status_code=401, detail="invalid or missing API token")
 
 class LoginRequest(BaseModel):
     api_token: str
