@@ -10,7 +10,6 @@ from prometheus_client import start_http_server
 
 from workers.celery_app import celery_app
 
-
 logger = logging.getLogger(__name__)
 
 
