@@ -11,6 +11,11 @@ import {
   Pause,
   Play,
   Radio,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  Flag,
+  AlertTriangle,
 } from "lucide-react";
 
 import Card from "@/components/Card";
@@ -30,6 +35,45 @@ import AudioIndicator from "@/components/AudioIndicator";
 // Persisted so a refresh doesn't silently drop a paused interview back to
 // the "start a new one" screen.
 const SESSION_STORAGE_KEY = "iv_interview_session_state";
+
+// ============================================================
+// Interview Session Progress & Question Navigator
+// ------------------------------------------------------------
+// TEMPORARY PLACEHOLDER: the app does not yet have a real, wired-up
+// per-session question list on the frontend. The backend exposes
+// `/interviews/ask-question` and `/interviews/submit-answer`, but
+// nothing in this page calls them yet, so there is no live source of
+// truth to derive question count/order from today.
+//
+// MOCK_QUESTIONS stands in for that missing state so the progress
+// indicator and Previous/Next navigator below have something real to
+// track. When the interview flow is wired to the backend's per-session
+// questions, replace MOCK_QUESTIONS (and the currentQuestionIndex state
+// derived from it) with the real question list/index — the rest of the
+// progress UI should keep working unchanged.
+// ============================================================
+const MOCK_QUESTIONS = [
+  {
+    text: "Welcome to your AI Interview. Please review the instructions and answer clearly.",
+    audioUrl: "",
+  },
+  {
+    text: "Tell me about a challenging project you've worked on.",
+    audioUrl: "",
+  },
+  {
+    text: "How do you approach debugging a production issue?",
+    audioUrl: "",
+  },
+  {
+    text: "Describe a time you disagreed with a teammate. How did you resolve it?",
+    audioUrl: "",
+  },
+  {
+    text: "What are you most proud of in your career so far?",
+    audioUrl: "",
+  },
+];
 
 function readPersistedSession() {
   if (typeof window === "undefined") return null;
@@ -98,10 +142,28 @@ export default function InterviewPage() {
   const [voiceError, setVoiceError] = useState(null);
 
   // 💡 Task B3: State loop context tracker definition for active question data strings
-  const [currentQuestion, setCurrentQuestion] = useState({
-    text: "Welcome to your AI Interview. Please review the instructions and answer clearly.",
-    audioUrl: ""
-  });
+  //
+  // Issue: Interview Session Progress & Question Navigator
+  // currentQuestion is now derived from currentQuestionIndex against
+  // MOCK_QUESTIONS (see module-level comment above) so the progress
+  // indicator, step navigator, and this question card can never drift
+  // out of sync with one another — they all read the same index.
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const totalQuestions = MOCK_QUESTIONS.length;
+  const currentQuestion = MOCK_QUESTIONS[currentQuestionIndex];
+  const isFirstQuestion = currentQuestionIndex === 0;
+  const isFinalQuestion = currentQuestionIndex === totalQuestions - 1;
+  const progressPercent = Math.round(
+    ((currentQuestionIndex + 1) / totalQuestions) * 100
+  );
+
+  const handlePreviousQuestion = useCallback(() => {
+    setCurrentQuestionIndex((i) => Math.max(0, i - 1));
+  }, []);
+
+  const handleNextQuestion = useCallback(() => {
+    setCurrentQuestionIndex((i) => Math.min(totalQuestions - 1, i + 1));
+  }, [totalQuestions]);
 
   // 🔊 Task B3: Hook evaluation lifecycle deployment logic sequence
   const { isPlaying } = useAudioPlayback(currentQuestion?.audioUrl, () => {
@@ -334,6 +396,9 @@ export default function InterviewPage() {
       // Reset Issue #18 score for new session.
       setIntegrityScore(null);
 
+      // Reset question progress for the new session.
+      setCurrentQuestionIndex(0);
+
       const cameraStarted = await startCamera();
       if (!cameraStarted) {
         setIsLive(false);
@@ -380,6 +445,9 @@ export default function InterviewPage() {
     // ISSUE #18 - Reset integrity score
     // ============================================================
     setIntegrityScore(null);
+
+    // Reset question progress so the next interview starts at question 1.
+    setCurrentQuestionIndex(0);
 
     setFeedback([]);
 
@@ -492,6 +560,113 @@ export default function InterviewPage() {
             <h3 className="text-xl font-semibold text-zinc-100 mt-3">
               {currentQuestion?.text}
             </h3>
+          </div>
+
+          {/* ======================================================
+              QUESTION PROGRESS & NAVIGATOR
+              Derived entirely from currentQuestionIndex / MOCK_QUESTIONS
+              above, so it cannot go out of sync with the question shown.
+          ====================================================== */}
+          <div className="mt-4 border-t border-zinc-800 pt-4">
+            <div className="flex items-center justify-between text-xs text-muted">
+              <span>
+                Question {currentQuestionIndex + 1} of {totalQuestions}
+              </span>
+
+              <span className="flex items-center gap-2">
+                {isFinalQuestion && (
+                  <span className="flex items-center gap-1 font-medium text-amber-400">
+                    <Flag size={12} />
+                    Final question
+                  </span>
+                )}
+                {progressPercent}%
+              </span>
+            </div>
+
+            <div
+              className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Interview progress"
+            >
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div
+              className="mt-3 flex flex-wrap items-center gap-1.5"
+              role="list"
+              aria-label="Question progress steps"
+            >
+              {MOCK_QUESTIONS.map((_, i) => {
+                const isCompleted = i < currentQuestionIndex;
+                const isCurrent = i === currentQuestionIndex;
+
+                return (
+                  <span
+                    key={i}
+                    role="listitem"
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-label={
+                      isCompleted
+                        ? `Question ${i + 1}, completed`
+                        : isCurrent
+                          ? `Question ${i + 1}, current`
+                          : `Question ${i + 1}, upcoming`
+                    }
+                    title={
+                      isCompleted
+                        ? "Completed"
+                        : isCurrent
+                          ? "Current question"
+                          : "Upcoming"
+                    }
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-medium",
+                      isCompleted &&
+                        "bg-emerald-500/20 text-emerald-400",
+                      isCurrent && "bg-accent text-white",
+                      !isCompleted &&
+                        !isCurrent &&
+                        "bg-zinc-800 text-zinc-500"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 size={12} />
+                    ) : (
+                      i + 1
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handlePreviousQuestion}
+                disabled={isFirstQuestion}
+                className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+                Previous
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNextQuestion}
+                disabled={isFinalQuestion}
+                className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         </Card>
 
