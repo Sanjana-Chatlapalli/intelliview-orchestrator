@@ -95,7 +95,7 @@ def create_candidate_routes(candidate_manager) -> APIRouter:
         search: str | None = Query(default=None),
         status: str | None = Query(default=None),
         role: str | None = Query(default=None),
-        limit: int = 100,
+        limit: int = Query(default=100, ge=1, le=100),
         session_db: Session = Depends(get_db),
     ):
         """List all candidates with search and filter support"""

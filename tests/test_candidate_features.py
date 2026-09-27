@@ -264,3 +264,15 @@ def test_streak_and_badge_logic():
 
     cand_d5 = candidate_manager.get_candidate(candidate_id)
     assert cand_d5["practice_streak"] == 1
+
+
+def test_candidate_listing_limit_validation():
+    """Verify candidate listing limit is between 1 and 100."""
+    response = client.get("/candidates?limit=100")
+    assert response.status_code == 200
+
+    response = client.get("/candidates?limit=101")
+    assert response.status_code == 422
+
+    response = client.get("/candidates?limit=0")
+    assert response.status_code == 422
