@@ -132,10 +132,19 @@ class SessionManager:
         question_id: str,
     ) -> None:
         """Cancel the timer for an answered interview question."""
-        task = self._question_timers.pop((session_id, question_id), None)
+        timers = getattr(self, "_question_timers", {})
+        task = timers.pop((session_id, question_id), None)
 
         if task and not task.done():
             task.cancel()
+
+    def cancel_session_question_timers(self, session_id: str) -> None:
+        """Cancel all active question timers for a session."""
+        timers = getattr(self, "_question_timers", {})
+
+        for timer_session_id, question_id in list(timers):
+            if timer_session_id == session_id:
+                self.cancel_question_timer(session_id, question_id)
 
     def create_session(
         self,
@@ -262,6 +271,13 @@ class SessionManager:
             interview.status = new_status
             interview.updated_at = _utcnow()
             session_db.commit()
+            if new_status in {
+                self.COMPLETED,
+                self.FAILED,
+                self.TIMEOUT,
+                self.CANCELLED,
+            }:
+                self.cancel_session_question_timers(session_id)
 
             # Update Redis cache (skip if circuit breaker is open)
             if not is_circuit_open():
@@ -424,6 +440,8 @@ class SessionManager:
             interview.updated_at = _utcnow()
 
             session_db.commit()
+
+            self.cancel_session_question_timers(session_id)
 
             # Update Redis (skip if circuit breaker is open)
             if not is_circuit_open():

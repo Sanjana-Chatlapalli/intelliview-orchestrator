@@ -141,6 +141,46 @@ class TestCreateSession:
 
 
 class TestUpdateSessionStatus:
+    async def test_terminal_status_cancels_all_question_timers(self, manager):
+        session_id = "session_abc123"
+        other_session_id = "session_other"
+
+        timer_1 = MagicMock()
+        timer_1.done.return_value = False
+        timer_2 = MagicMock()
+        timer_2.done.return_value = False
+        other_timer = MagicMock()
+        other_timer.done.return_value = False
+
+        manager._question_timers = {
+            (session_id, "question_1"): timer_1,
+            (session_id, "question_2"): timer_2,
+            (other_session_id, "question_3"): other_timer,
+        }
+
+        db = make_db_session(
+            scalar_result=make_interview(
+                SessionManager.PROCESSING,
+                session_id=session_id,
+            )
+        )
+
+        with patch.object(sm_module, "SessionLocal", return_value=db):
+            result = manager.update_session_status(
+                session_id,
+                SessionManager.COMPLETED,
+            )
+
+        assert result is True
+
+        timer_1.cancel.assert_called_once()
+        timer_2.cancel.assert_called_once()
+        other_timer.cancel.assert_not_called()
+
+        assert (session_id, "question_1") not in manager._question_timers
+        assert (session_id, "question_2") not in manager._question_timers
+        assert (other_session_id, "question_3") in manager._question_timers
+
     def test_valid_transition_updates_db_and_redis(self, manager):
         interview = make_interview(SessionManager.CREATED)
         db = make_db_session(scalar_result=interview)
@@ -276,6 +316,30 @@ class TestUpdateSessionStatus:
                 )
 
         asyncio.run(scenario())
+
+
+class TestQuestionTimers:
+    @pytest.mark.asyncio
+    async def test_cancelled_question_timer_does_not_trigger_timeout(self, manager):
+        on_timeout = AsyncMock()
+
+        manager.start_question_timer(
+            "session_abc123",
+            "question_1",
+            on_timeout,
+        )
+
+        assert ("session_abc123", "question_1") in manager._question_timers
+
+        manager.cancel_question_timer(
+            "session_abc123",
+            "question_1",
+        )
+
+        await asyncio.sleep(0)
+
+        on_timeout.assert_not_awaited()
+        assert ("session_abc123", "question_1") not in manager._question_timers
 
 
 # ---------------------------------------------------------------------------
