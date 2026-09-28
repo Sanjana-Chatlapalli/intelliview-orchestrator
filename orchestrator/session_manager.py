@@ -342,6 +342,8 @@ class SessionManager:
                 "video_analysis": interview.video_analysis,
                 "audio_analysis": interview.audio_analysis,
                 "evaluation_analysis": interview.evaluation_analysis,
+                "questions_asked": interview.questions_asked or [],
+                "answers_provided": interview.answers_provided or [],
             }
 
             # Repopulate Redis cache
