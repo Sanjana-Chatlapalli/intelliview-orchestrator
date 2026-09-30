@@ -1,4 +1,8 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// All requests are routed through the Next.js rewrite defined in next.config.js
+// (`/api/backend/:path*` -> NEXT_PUBLIC_API_URL). This keeps every request
+// same-origin from the browser's perspective, so no CORS configuration is
+// needed on the backend, and there's a single consistent routing pattern.
+const API_BASE = "/api/backend";
 
 class ApiClient {
   token = null;

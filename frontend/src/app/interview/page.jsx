@@ -11,6 +11,11 @@ import {
   Pause,
   Play,
   Radio,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  Flag,
+  AlertTriangle,
 } from "lucide-react";
 
 import Card from "@/components/Card";
@@ -30,6 +35,45 @@ import AudioIndicator from "@/components/AudioIndicator";
 // Persisted so a refresh doesn't silently drop a paused interview back to
 // the "start a new one" screen.
 const SESSION_STORAGE_KEY = "iv_interview_session_state";
+
+// ============================================================
+// Interview Session Progress & Question Navigator
+// ------------------------------------------------------------
+// TEMPORARY PLACEHOLDER: the app does not yet have a real, wired-up
+// per-session question list on the frontend. The backend exposes
+// `/interviews/ask-question` and `/interviews/submit-answer`, but
+// nothing in this page calls them yet, so there is no live source of
+// truth to derive question count/order from today.
+//
+// MOCK_QUESTIONS stands in for that missing state so the progress
+// indicator and Previous/Next navigator below have something real to
+// track. When the interview flow is wired to the backend's per-session
+// questions, replace MOCK_QUESTIONS (and the currentQuestionIndex state
+// derived from it) with the real question list/index — the rest of the
+// progress UI should keep working unchanged.
+// ============================================================
+const MOCK_QUESTIONS = [
+  {
+    text: "Welcome to your AI Interview. Please review the instructions and answer clearly.",
+    audioUrl: "",
+  },
+  {
+    text: "Tell me about a challenging project you've worked on.",
+    audioUrl: "",
+  },
+  {
+    text: "How do you approach debugging a production issue?",
+    audioUrl: "",
+  },
+  {
+    text: "Describe a time you disagreed with a teammate. How did you resolve it?",
+    audioUrl: "",
+  },
+  {
+    text: "What are you most proud of in your career so far?",
+    audioUrl: "",
+  },
+];
 
 function readPersistedSession() {
   if (typeof window === "undefined") return null;
@@ -98,10 +142,28 @@ export default function InterviewPage() {
   const [voiceError, setVoiceError] = useState(null);
 
   // 💡 Task B3: State loop context tracker definition for active question data strings
-  const [currentQuestion, setCurrentQuestion] = useState({
-    text: "Welcome to your AI Interview. Please review the instructions and answer clearly.",
-    audioUrl: ""
-  });
+  //
+  // Issue: Interview Session Progress & Question Navigator
+  // currentQuestion is now derived from currentQuestionIndex against
+  // MOCK_QUESTIONS (see module-level comment above) so the progress
+  // indicator, step navigator, and this question card can never drift
+  // out of sync with one another — they all read the same index.
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const totalQuestions = MOCK_QUESTIONS.length;
+  const currentQuestion = MOCK_QUESTIONS[currentQuestionIndex];
+  const isFirstQuestion = currentQuestionIndex === 0;
+  const isFinalQuestion = currentQuestionIndex === totalQuestions - 1;
+  const progressPercent = Math.round(
+    ((currentQuestionIndex + 1) / totalQuestions) * 100
+  );
+
+  const handlePreviousQuestion = useCallback(() => {
+    setCurrentQuestionIndex((i) => Math.max(0, i - 1));
+  }, []);
+
+  const handleNextQuestion = useCallback(() => {
+    setCurrentQuestionIndex((i) => Math.min(totalQuestions - 1, i + 1));
+  }, [totalQuestions]);
 
   // 🔊 Task B3: Hook evaluation lifecycle deployment logic sequence
   const { isPlaying } = useAudioPlayback(currentQuestion?.audioUrl, () => {
@@ -200,6 +262,15 @@ export default function InterviewPage() {
       }
     }
   }, [sessionStatus]);
+  
+  // ---- Interview progress + leave confirmation ----
+  const sessionTotalQuestions =
+    Number(sessionStatus?.total_questions ?? 0) || 0;
+  const questionIndex = Number(sessionStatus?.current_question_index ?? 0) || 0;
+
+  // The interview is "incomplete" for as long as it is live.
+  // Pressing End sets isLive to false, so the warning turns off by itself.
+  useLeaveConfirmation(isLive);
 
   const startCamera = useCallback(async () => {
     const maxAttempts = 3;
@@ -263,6 +334,7 @@ export default function InterviewPage() {
     toast.error("Voice access failed", message);
     return false;
   }, []);
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current
@@ -334,6 +406,9 @@ export default function InterviewPage() {
       // Reset Issue #18 score for new session.
       setIntegrityScore(null);
 
+      // Reset question progress for the new session.
+      setCurrentQuestionIndex(0);
+
       const cameraStarted = await startCamera();
       if (!cameraStarted) {
         setIsLive(false);
@@ -380,6 +455,9 @@ export default function InterviewPage() {
     // ISSUE #18 - Reset integrity score
     // ============================================================
     setIntegrityScore(null);
+
+    // Reset question progress so the next interview starts at question 1.
+    setCurrentQuestionIndex(0);
 
     setFeedback([]);
 
@@ -486,12 +564,125 @@ export default function InterviewPage() {
 
 
         {/* 🔊 Task B3: Visual Audio Playback State Component Layout Render */}
+        {isLive && (
+          <InterviewProgress
+            currentIndex={questionIndex}
+            total={sessionTotalQuestions}
+          />
+        )}
         <Card className="p-6 bg-zinc-900 border-zinc-800">
           <div className="mb-4">
             <AudioIndicator isPlaying={isPlaying} />
             <h3 className="text-xl font-semibold text-zinc-100 mt-3">
               {currentQuestion?.text}
             </h3>
+          </div>
+
+          {/* ======================================================
+              QUESTION PROGRESS & NAVIGATOR
+              Derived entirely from currentQuestionIndex / MOCK_QUESTIONS
+              above, so it cannot go out of sync with the question shown.
+          ====================================================== */}
+          <div className="mt-4 border-t border-zinc-800 pt-4">
+            <div className="flex items-center justify-between text-xs text-muted">
+              <span>
+                Question {currentQuestionIndex + 1} of {totalQuestions}
+              </span>
+
+              <span className="flex items-center gap-2">
+                {isFinalQuestion && (
+                  <span className="flex items-center gap-1 font-medium text-amber-400">
+                    <Flag size={12} />
+                    Final question
+                  </span>
+                )}
+                {progressPercent}%
+              </span>
+            </div>
+
+            <div
+              className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Interview progress"
+            >
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div
+              className="mt-3 flex flex-wrap items-center gap-1.5"
+              role="list"
+              aria-label="Question progress steps"
+            >
+              {MOCK_QUESTIONS.map((_, i) => {
+                const isCompleted = i < currentQuestionIndex;
+                const isCurrent = i === currentQuestionIndex;
+
+                return (
+                  <span
+                    key={i}
+                    role="listitem"
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-label={
+                      isCompleted
+                        ? `Question ${i + 1}, completed`
+                        : isCurrent
+                          ? `Question ${i + 1}, current`
+                          : `Question ${i + 1}, upcoming`
+                    }
+                    title={
+                      isCompleted
+                        ? "Completed"
+                        : isCurrent
+                          ? "Current question"
+                          : "Upcoming"
+                    }
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-medium",
+                      isCompleted &&
+                        "bg-emerald-500/20 text-emerald-400",
+                      isCurrent && "bg-accent text-white",
+                      !isCompleted &&
+                        !isCurrent &&
+                        "bg-zinc-800 text-zinc-500"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 size={12} />
+                    ) : (
+                      i + 1
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handlePreviousQuestion}
+                disabled={isFirstQuestion}
+                className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+                Previous
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNextQuestion}
+                disabled={isFinalQuestion}
+                className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         </Card>
 
@@ -532,7 +723,7 @@ export default function InterviewPage() {
                   starting ||
                   !candidate.trim()
                 }
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-50 sm:w-auto sm:justify-start"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-50 sm:w-auto"
               >
                 <Video size={14} />
 
@@ -853,12 +1044,7 @@ export default function InterviewPage() {
                   </Badge>
                 )}
               </div>
-          </div>
-        </Card>
 
-
-
-            
               {/* ==================================================
                   ISSUE #18 - Integrity status
               ================================================== */}
@@ -878,8 +1064,8 @@ export default function InterviewPage() {
                   </Badge>
                 )}
               </div>
-
-         
+            </div>
+          </Card>
 
           {/* ====================================================
               RISK TIMELINE
@@ -908,4 +1094,117 @@ export default function InterviewPage() {
       </div>
     </ErrorBoundary>
   );
+}
+
+function InterviewProgress({ currentIndex, total }) {
+  if (!total || total < 1) {
+    return (
+      <Card title="Interview Progress">
+        <div className="text-sm text-muted">
+          Waiting for question information...
+        </div>
+      </Card>
+    );
+  }
+
+  const safeIndex = Math.min(Math.max(currentIndex, 0), total - 1);
+  const completed = safeIndex;
+  const percent = Math.round((completed / total) * 100);
+
+  return (
+    <Card title="Interview Progress">
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-semibold text-zinc-100">
+          Question {safeIndex + 1} of {total}
+        </span>
+        <span className="text-xs text-muted">
+          {completed} completed · {total - completed} remaining
+        </span>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-label="Interview progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+      >
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {Array.from({ length: total }, (_, i) => {
+          const status =
+            i < safeIndex ? "completed" : i === safeIndex ? "current" : "remaining";
+          return (
+            <span
+              key={i}
+              title={`Question ${i + 1}: ${status}`}
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium",
+                status === "completed" && "bg-emerald-500 text-white",
+                status === "current" && "bg-indigo-500 text-white ring-2 ring-indigo-300",
+                status === "remaining" && "bg-zinc-700 text-zinc-300"
+              )}
+            >
+              {status === "completed" ? "✓" : i + 1}
+            </span>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 text-[11px] text-muted">
+        ✓ green = completed · blue = current · grey = remaining
+      </div>
+    </Card>
+  );
+}
+
+function useLeaveConfirmation(shouldBlock) {
+  useEffect(() => {
+    if (!shouldBlock) return undefined;
+
+    const message =
+      "Your interview is not complete. Are you sure you want to leave?";
+
+    // Refresh, close tab, or type a new address
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    // Clicking a link inside the app (sidebar, logo, etc.)
+    const onClick = (e) => {
+      const a =
+        e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!a || a.target === "_blank") return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search
+      ) {
+        return;
+      }
+
+      if (!window.confirm(message)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [shouldBlock]);
 }
