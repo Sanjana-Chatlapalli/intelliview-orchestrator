@@ -262,6 +262,15 @@ export default function InterviewPage() {
       }
     }
   }, [sessionStatus]);
+  
+  // ---- Interview progress + leave confirmation ----
+  const sessionTotalQuestions =
+    Number(sessionStatus?.total_questions ?? 0) || 0;
+  const questionIndex = Number(sessionStatus?.current_question_index ?? 0) || 0;
+
+  // The interview is "incomplete" for as long as it is live.
+  // Pressing End sets isLive to false, so the warning turns off by itself.
+  useLeaveConfirmation(isLive);
 
   const startCamera = useCallback(async () => {
     const maxAttempts = 3;
@@ -325,6 +334,7 @@ export default function InterviewPage() {
     toast.error("Voice access failed", message);
     return false;
   }, []);
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current
@@ -554,6 +564,12 @@ export default function InterviewPage() {
 
 
         {/* 🔊 Task B3: Visual Audio Playback State Component Layout Render */}
+        {isLive && (
+          <InterviewProgress
+            currentIndex={questionIndex}
+            total={sessionTotalQuestions}
+          />
+        )}
         <Card className="p-6 bg-zinc-900 border-zinc-800">
           <div className="mb-4">
             <AudioIndicator isPlaying={isPlaying} />
@@ -707,7 +723,7 @@ export default function InterviewPage() {
                   starting ||
                   !candidate.trim()
                 }
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-50 sm:w-auto sm:justify-start"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-50 sm:w-auto"
               >
                 <Video size={14} />
 
@@ -1028,12 +1044,7 @@ export default function InterviewPage() {
                   </Badge>
                 )}
               </div>
-          </div>
-        </Card>
 
-
-
-            
               {/* ==================================================
                   ISSUE #18 - Integrity status
               ================================================== */}
@@ -1053,8 +1064,8 @@ export default function InterviewPage() {
                   </Badge>
                 )}
               </div>
-
-         
+            </div>
+          </Card>
 
           {/* ====================================================
               RISK TIMELINE
@@ -1083,4 +1094,117 @@ export default function InterviewPage() {
       </div>
     </ErrorBoundary>
   );
+}
+
+function InterviewProgress({ currentIndex, total }) {
+  if (!total || total < 1) {
+    return (
+      <Card title="Interview Progress">
+        <div className="text-sm text-muted">
+          Waiting for question information...
+        </div>
+      </Card>
+    );
+  }
+
+  const safeIndex = Math.min(Math.max(currentIndex, 0), total - 1);
+  const completed = safeIndex;
+  const percent = Math.round((completed / total) * 100);
+
+  return (
+    <Card title="Interview Progress">
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-semibold text-zinc-100">
+          Question {safeIndex + 1} of {total}
+        </span>
+        <span className="text-xs text-muted">
+          {completed} completed · {total - completed} remaining
+        </span>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-label="Interview progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+      >
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {Array.from({ length: total }, (_, i) => {
+          const status =
+            i < safeIndex ? "completed" : i === safeIndex ? "current" : "remaining";
+          return (
+            <span
+              key={i}
+              title={`Question ${i + 1}: ${status}`}
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium",
+                status === "completed" && "bg-emerald-500 text-white",
+                status === "current" && "bg-indigo-500 text-white ring-2 ring-indigo-300",
+                status === "remaining" && "bg-zinc-700 text-zinc-300"
+              )}
+            >
+              {status === "completed" ? "✓" : i + 1}
+            </span>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 text-[11px] text-muted">
+        ✓ green = completed · blue = current · grey = remaining
+      </div>
+    </Card>
+  );
+}
+
+function useLeaveConfirmation(shouldBlock) {
+  useEffect(() => {
+    if (!shouldBlock) return undefined;
+
+    const message =
+      "Your interview is not complete. Are you sure you want to leave?";
+
+    // Refresh, close tab, or type a new address
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    // Clicking a link inside the app (sidebar, logo, etc.)
+    const onClick = (e) => {
+      const a =
+        e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!a || a.target === "_blank") return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search
+      ) {
+        return;
+      }
+
+      if (!window.confirm(message)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [shouldBlock]);
 }
